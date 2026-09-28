@@ -5,15 +5,15 @@
   --surface: #ffffff;
   --surface-2: #f3f4f6;
   --hover: #eef0f3;
-  --selected: #e8ecff;
+  --selected: #e3edff;
   --text: #16181d;
   --text-2: #555b67;
   --text-3: #8b919d;
   --border: #e5e7eb;
   --border-strong: #d2d6dd;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-soft: #eef0ff;
+  --accent: #1a6cf0;
+  --accent-hover: #1459d1;
+  --accent-soft: #e8f0fe;
   --accent-text: #ffffff;
   --danger: #dc2626;
   --danger-soft: #fdeded;
@@ -30,25 +30,25 @@
   --doc-fold: #eceef2;
   --toast-bg: #1d1f25;
   --toast-text: #f4f4f6;
-  --toast-accent: #a5a1ff;
+  --toast-accent: #8ab4ff;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0e0f13;
+    --bg: #0a0e17;
     --surface: #16171c;
     --surface-2: #1c1d24;
     --hover: #22242c;
-    --selected: #262a47;
+    --selected: #1b2a4a;
     --text: #ececf1;
     --text-2: #a5a8b4;
     --text-3: #6f7380;
     --border: #262830;
     --border-strong: #353843;
-    --accent: #7c75ff;
-    --accent-hover: #8f89ff;
-    --accent-soft: #22234a;
+    --accent: #4b8cff;
+    --accent-hover: #6aa0ff;
+    --accent-soft: #16244a;
     --danger: #f26d6d;
     --danger-soft: #3a1b1e;
     --success: #3fcf7f;
@@ -64,25 +64,25 @@
     --doc-fold: #30323c;
     --toast-bg: #f4f4f6;
     --toast-text: #16181d;
-    --toast-accent: #4f46e5;
+    --toast-accent: #1a6cf0;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0e0f13;
+  --bg: #0a0e17;
   --surface: #16171c;
   --surface-2: #1c1d24;
   --hover: #22242c;
-  --selected: #262a47;
+  --selected: #1b2a4a;
   --text: #ececf1;
   --text-2: #a5a8b4;
   --text-3: #6f7380;
   --border: #262830;
   --border-strong: #353843;
-  --accent: #7c75ff;
-  --accent-hover: #8f89ff;
-  --accent-soft: #22234a;
+  --accent: #4b8cff;
+  --accent-hover: #6aa0ff;
+  --accent-soft: #16244a;
   --danger: #f26d6d;
   --danger-soft: #3a1b1e;
   --success: #3fcf7f;
@@ -98,7 +98,7 @@
   --doc-fold: #30323c;
   --toast-bg: #f4f4f6;
   --toast-text: #16181d;
-  --toast-accent: #4f46e5;
+  --toast-accent: #1a6cf0;
   color-scheme: dark;
 }
 
@@ -253,11 +253,6 @@
   .backdrop {
     background: rgb(8 9 12 / 0.45);
     animation: fade 0.15s ease-out;
-  }
-  .brand-mark {
-    @apply w-8 h-8 rounded-[9px] flex items-center justify-center text-white text-sm font-bold shrink-0;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 55%, #d946ef 100%);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 2px 6px rgb(99 102 241 / 0.35);
   }
   .avatar {
     @apply w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0;

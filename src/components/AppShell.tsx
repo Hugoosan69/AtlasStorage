@@ -54,8 +54,12 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
   const sidebar = (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2.5 px-4 h-14 shrink-0">
-        <div className="brand-mark">A</div>
-        <span className="font-semibold text-[15px] tracking-tight">Atlas</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-mark.png" alt="" className="w-8 h-8 shrink-0" />
+        <div className="leading-none">
+          <div className="font-bold text-[15px] tracking-wide">ATLAS</div>
+          <div className="text-[9px] font-semibold tracking-[0.32em] mt-0.5" style={{ color: "var(--accent)" }}>STORAGE</div>
+        </div>
       </div>
 
       <nav className="px-2.5 space-y-0.5 shrink-0">
@@ -136,8 +140,9 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
             <button className="btn btn-ghost btn-icon" onClick={() => setDrawer(true)} aria-label="Abrir menu">
               <MenuIcon size={20} />
             </button>
-            <div className="brand-mark !w-7 !h-7 !text-xs">A</div>
-            <span className="font-semibold">Atlas</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-mark.png" alt="" className="w-7 h-7" />
+            <span className="font-bold tracking-wide">ATLAS</span>
           </header>
           <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
         </div>

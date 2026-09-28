@@ -43,36 +43,26 @@ export default function LoginPage() {
   return (
     <div className="min-h-dvh grid lg:grid-cols-2">
       <div
-        className="hidden lg:flex flex-col justify-between p-12 text-white relative overflow-hidden"
-        style={{ background: "linear-gradient(145deg, #312e81 0%, #4f46e5 55%, #7c3aed 100%)" }}
+        className="hidden lg:flex flex-col items-center justify-center p-12 text-white relative overflow-hidden"
+        style={{ background: "#080e1b" }}
       >
-        <div className="flex items-center gap-2.5 relative z-10">
-          <div className="w-9 h-9 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center font-bold">A</div>
-          <span className="font-semibold text-lg">Atlas</span>
-        </div>
-        <div className="relative z-10 max-w-md">
-          <h2 className="text-4xl font-semibold leading-tight tracking-tight">
-            Seus arquivos, organizados e seguros.
-          </h2>
-          <p className="mt-4 text-white/70">
-            Acesse, envie e compartilhe documentos da equipe com permissões sob controle.
-          </p>
-        </div>
-        <p className="text-sm text-white/50 relative z-10">© {new Date().getFullYear()} Atlas</p>
-        <div className="absolute -right-32 -bottom-32 w-[28rem] h-[28rem] rounded-full bg-white/10" />
-        <div className="absolute right-24 top-24 w-40 h-40 rounded-full bg-white/5" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-full.jpg" alt="Atlas Storage" className="w-[26rem] max-w-full h-auto" />
+        <p className="mt-2 max-w-sm text-center text-white/60">
+          Seus arquivos do Google Drive, organizados e com permissões sob controle.
+        </p>
+        <p className="absolute bottom-8 text-sm text-white/35">© {new Date().getFullYear()} Atlas Storage</p>
       </div>
 
       <div className="flex items-center justify-center px-5 py-12" style={{ background: "var(--bg)" }}>
         <div className="w-full max-w-sm">
-          <div className="lg:hidden flex items-center gap-2.5 mb-10">
-            <div
-              className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white"
-              style={{ background: "linear-gradient(135deg, var(--accent), #a855f7)" }}
-            >
-              A
+          <div className="lg:hidden flex items-center gap-3 mb-10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-mark.png" alt="" className="w-11 h-11" />
+            <div className="leading-tight">
+              <div className="font-bold text-lg tracking-wide">ATLAS</div>
+              <div className="text-[11px] font-semibold tracking-[0.3em]" style={{ color: "var(--accent)" }}>STORAGE</div>
             </div>
-            <span className="font-semibold text-lg">Atlas</span>
           </div>
 
           <h1 className="text-2xl font-semibold tracking-tight">Entrar</h1>

@@ -5,14 +5,14 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "Atlas",
+  title: "Atlas Storage",
   description: "Seus arquivos, organizados e seguros",
 };
 
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f6f7f9" },
-    { media: "(prefers-color-scheme: dark)", color: "#0e0f13" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0e17" },
   ],
 };
 
