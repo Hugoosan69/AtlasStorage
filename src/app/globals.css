@@ -1,59 +1,126 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-hover: #f1f3f5;
-  --bg-active: #e9ecef;
-  --text-primary: #1a1a2e;
-  --text-secondary: #6c757d;
-  --text-muted: #adb5bd;
-  --border: #dee2e6;
-  --accent: #4361ee;
-  --accent-hover: #3a56d4;
-  --accent-light: #eef0fd;
-  --danger: #ef4444;
-  --danger-hover: #dc2626;
-  --success: #22c55e;
-  --warning: #f59e0b;
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --surface-2: #f2f2f4;
+  --hover: #ececef;
+  --selected: #e6e9ff;
+  --text: #17171c;
+  --text-2: #5d5d6b;
+  --text-3: #9a9aa8;
+  --border: #e4e4e9;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft: #eef0ff;
+  --accent-text: #ffffff;
+  --danger: #dc2626;
+  --danger-soft: #fdecec;
+  --success: #16a34a;
+  --warning: #d97706;
+  --warning-soft: #fff6e5;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.08);
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg-primary: #1a1a2e;
-    --bg-secondary: #16213e;
-    --bg-hover: #1f2b47;
-    --bg-active: #263350;
-    --text-primary: #e8e8e8;
-    --text-secondary: #a0a0b0;
-    --text-muted: #6c6c7c;
-    --border: #2a2a4a;
-    --accent: #6c83f7;
-    --accent-hover: #5a72e6;
-    --accent-light: #1e2545;
-    --danger: #f87171;
-    --danger-hover: #ef4444;
+    --bg: #0f0f13;
+    --surface: #17171d;
+    --surface-2: #1d1d25;
+    --hover: #24242e;
+    --selected: #262a4d;
+    --text: #ededf2;
+    --text-2: #a3a3b2;
+    --text-3: #6b6b7a;
+    --border: #2a2a35;
+    --accent: #7c74ff;
+    --accent-hover: #8f88ff;
+    --accent-soft: #23234a;
+    --danger: #f26d6d;
+    --danger-soft: #3a1c1f;
+    --warning: #f0a53a;
+    --warning-soft: #33261a;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.45);
+    color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg-primary: #1a1a2e;
-  --bg-secondary: #16213e;
-  --bg-hover: #1f2b47;
-  --bg-active: #263350;
-  --text-primary: #e8e8e8;
-  --text-secondary: #a0a0b0;
-  --text-muted: #6c6c7c;
-  --border: #2a2a4a;
-  --accent: #6c83f7;
-  --accent-hover: #5a72e6;
-  --accent-light: #1e2545;
-  --danger: #f87171;
-  --danger-hover: #ef4444;
+  --bg: #0f0f13;
+  --surface: #17171d;
+  --surface-2: #1d1d25;
+  --hover: #24242e;
+  --selected: #262a4d;
+  --text: #ededf2;
+  --text-2: #a3a3b2;
+  --text-3: #6b6b7a;
+  --border: #2a2a35;
+  --accent: #7c74ff;
+  --accent-hover: #8f88ff;
+  --accent-soft: #23234a;
+  --danger: #f26d6d;
+  --danger-soft: #3a1c1f;
+  --warning: #f0a53a;
+  --warning-soft: #33261a;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
 }
 
 body {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 h-9 px-3.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .btn:hover { background: var(--hover); }
+  .btn-primary {
+    color: var(--accent-text);
+    background: var(--accent);
+    border-color: transparent;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-danger {
+    color: #fff;
+    background: var(--danger);
+    border-color: transparent;
+  }
+  .btn-danger:hover { filter: brightness(0.95); background: var(--danger); }
+  .btn-ghost {
+    background: transparent;
+    border-color: transparent;
+  }
+  .btn-icon { @apply w-9 px-0; }
+  .input {
+    @apply w-full h-10 px-3 rounded-lg text-sm outline-none transition-shadow;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    @apply rounded-xl;
+  }
+  .label { @apply block text-xs font-medium mb-1.5; color: var(--text-2); }
+}
+
+::selection { background: var(--accent-soft); }
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.animate-pop { animation: pop-in 0.14s ease-out; }

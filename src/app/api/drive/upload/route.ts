@@ -1,59 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getRootFolderId } from "@/lib/auth";
-import { uploadFile } from "@/lib/google-drive";
+import { createUploadSession } from "@/lib/google-drive";
 import { checkPermission } from "@/lib/permissions";
 import { logAction } from "@/lib/audit";
-import { Readable } from "stream";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireUser();
     const rootFolderId = await getRootFolderId();
 
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    const parentId = formData.get("parentId") as string | null;
+    const { parentId, name, mimeType, size } = await request.json();
 
-    if (!file || !parentId) {
+    if (!parentId || !name || typeof size !== "number") {
       return NextResponse.json(
-        { error: "file e parentId são obrigatórios" },
+        { error: "parentId, name e size são obrigatórios" },
         { status: 400 }
       );
     }
 
-    const canUpload = await checkPermission(
-      user.id,
-      parentId,
-      "can_upload",
-      rootFolderId
-    );
-
+    const canUpload = await checkPermission(user.id, parentId, "can_upload", rootFolderId);
     if (!canUpload) {
-      return NextResponse.json(
-        { error: "Sem permissão para upload" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Sem permissão para upload" }, { status: 403 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const stream = Readable.from(buffer);
-
-    const result = await uploadFile(parentId, file.name, file.type, stream);
+    const origin = request.headers.get("origin") || new URL(request.url).origin;
+    const uploadUrl = await createUploadSession(parentId, name, mimeType, size, origin);
 
     await logAction({
       userId: user.id,
       userEmail: user.email,
       action: "file.upload",
-      targetDriveId: result.id!,
-      targetName: file.name,
+      targetName: name,
       targetParentId: parentId,
-      details: { size: file.size, mimeType: file.type },
+      details: { size, mimeType },
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({ uploadUrl });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Erro interno do servidor";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Erro interno do servidor";
+    const status = message === "Unauthorized" ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     return new Response(webStream, {
       headers: {
         "Content-Type": mimeType,
-        "Content-Disposition": `attachment; filename="${encodeURIComponent(name)}"`,
+        "Content-Disposition": `attachment; filename="${name.replace(/[^\x20-\x7e]|"/g, "_")}"; filename*=UTF-8''${encodeURIComponent(name)}`,
       },
     });
   } catch (error) {

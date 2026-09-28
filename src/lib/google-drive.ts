@@ -35,8 +35,40 @@ async function getDriveClient(): Promise<drive_v3.Drive> {
   oauth2Client.setCredentials(credentials);
   tokenExpiresAt = credentials.expiry_date || now + 3500000;
 
+  accessToken = credentials.access_token || "";
   driveClient = google.drive({ version: "v3", auth: oauth2Client });
   return driveClient;
+}
+
+let accessToken = "";
+
+export async function createUploadSession(
+  parentId: string,
+  name: string,
+  mimeType: string,
+  size: number,
+  origin: string
+): Promise<string> {
+  await getDriveClient();
+  const res = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id,name",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Upload-Content-Type": mimeType || "application/octet-stream",
+        "X-Upload-Content-Length": String(size),
+        Origin: origin,
+      },
+      body: JSON.stringify({ name, parents: [parentId] }),
+    }
+  );
+  const location = res.headers.get("location");
+  if (!res.ok || !location) {
+    throw new Error(`Falha ao iniciar upload (${res.status})`);
+  }
+  return location;
 }
 
 export async function listFolder(

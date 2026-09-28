@@ -6,9 +6,13 @@ export async function GET() {
   try {
     await requireAdmin();
     const supabase = await createServiceClient();
-    const { data, error } = await supabase.from("settings").select("*");
+    const { data, error } = await supabase.from("settings").select("*").order("key");
     if (error) throw error;
-    return NextResponse.json(data);
+    return NextResponse.json(
+      (data || []).map((s) =>
+        s.key === "google_refresh_token" ? { ...s, value: s.value ? "••••••••" : "" } : s
+      )
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Erro interno";
@@ -22,7 +26,7 @@ export async function PATCH(request: NextRequest) {
     const supabase = await createServiceClient();
     const { key, value } = await request.json();
 
-    if (!key) {
+    if (!key || key === "google_refresh_token") {
       return NextResponse.json(
         { error: "key é obrigatório" },
         { status: 400 }
@@ -31,8 +35,7 @@ export async function PATCH(request: NextRequest) {
 
     const { error } = await supabase
       .from("settings")
-      .update({ value, updated_at: new Date().toISOString() })
-      .eq("key", key);
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
 
     if (error) throw error;
     return NextResponse.json({ success: true });
