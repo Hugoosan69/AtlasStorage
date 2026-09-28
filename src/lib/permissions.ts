@@ -89,29 +89,14 @@ async function getFolderChain(
 ): Promise<string[]> {
   if (folderId === rootFolderId) return [rootFolderId];
 
-  const { google } = await import("googleapis");
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(
-        /\\n/g,
-        "\n"
-      ),
-    },
-    scopes: ["https://www.googleapis.com/auth/drive.metadata.readonly"],
-  });
-
-  const drive = google.drive({ version: "v3", auth });
+  const { getFileMetadata } = await import("./google-drive");
   const chain: string[] = [];
   let currentId = folderId;
 
   while (currentId && currentId !== rootFolderId) {
     chain.unshift(currentId);
-    const res = await drive.files.get({
-      fileId: currentId,
-      fields: "parents",
-    });
-    currentId = res.data.parents?.[0] || "";
+    const meta = await getFileMetadata(currentId);
+    currentId = meta.parents?.[0] || "";
   }
 
   chain.unshift(rootFolderId);

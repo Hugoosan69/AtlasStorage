@@ -1,22 +1,41 @@
 import { google, drive_v3 } from "googleapis";
+import { createServiceClient } from "./supabase/server";
 
 let driveClient: drive_v3.Drive | null = null;
+let tokenExpiresAt = 0;
 
-function getDriveClient(): drive_v3.Drive {
-  if (driveClient) return driveClient;
+async function getRefreshToken(): Promise<string> {
+  const supabase = await createServiceClient();
+  const { data } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("key", "google_refresh_token")
+    .single();
 
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(
-        /\\n/g,
-        "\n"
-      ),
-    },
-    scopes: ["https://www.googleapis.com/auth/drive"],
-  });
+  if (!data?.value) {
+    throw new Error("Google Drive não conectado. Faça a conexão em Administração > Configurações.");
+  }
+  return data.value;
+}
 
-  driveClient = google.drive({ version: "v3", auth });
+async function getDriveClient(): Promise<drive_v3.Drive> {
+  const now = Date.now();
+  if (driveClient && now < tokenExpiresAt - 60000) return driveClient;
+
+  const refreshToken = await getRefreshToken();
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+  const { credentials } = await oauth2Client.refreshAccessToken();
+  oauth2Client.setCredentials(credentials);
+  tokenExpiresAt = credentials.expiry_date || now + 3500000;
+
+  driveClient = google.drive({ version: "v3", auth: oauth2Client });
   return driveClient;
 }
 
@@ -25,7 +44,7 @@ export async function listFolder(
   pageToken?: string,
   pageSize: number = 100
 ) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   const response = await drive.files.list({
     q: `'${folderId}' in parents and trashed = false`,
     fields:
@@ -52,7 +71,7 @@ export async function listFolder(
 }
 
 export async function getFileMetadata(fileId: string) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   const response = await drive.files.get({
     fileId,
     fields: "id, name, mimeType, size, modifiedTime, parents, iconLink",
@@ -61,7 +80,7 @@ export async function getFileMetadata(fileId: string) {
 }
 
 export async function downloadFile(fileId: string) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   const meta = await drive.files.get({
     fileId,
     fields: "mimeType, name",
@@ -106,7 +125,7 @@ export async function uploadFile(
   mimeType: string,
   body: NodeJS.ReadableStream
 ) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   const response = await drive.files.create({
     requestBody: {
       name: fileName,
@@ -122,7 +141,7 @@ export async function uploadFile(
 }
 
 export async function createFolder(parentId: string, folderName: string) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   const response = await drive.files.create({
     requestBody: {
       name: folderName,
@@ -135,7 +154,7 @@ export async function createFolder(parentId: string, folderName: string) {
 }
 
 export async function renameItem(fileId: string, newName: string) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   const response = await drive.files.update({
     fileId,
     requestBody: { name: newName },
@@ -149,7 +168,7 @@ export async function moveItem(
   newParentId: string,
   currentParentId: string
 ) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   const response = await drive.files.update({
     fileId,
     addParents: newParentId,
@@ -160,7 +179,7 @@ export async function moveItem(
 }
 
 export async function deleteItem(fileId: string) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   await drive.files.update({
     fileId,
     requestBody: { trashed: true },
@@ -168,7 +187,7 @@ export async function deleteItem(fileId: string) {
 }
 
 export async function searchFiles(query: string, rootFolderId: string) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   async function getAllFolderIds(parentId: string): Promise<string[]> {
     const ids = [parentId];
@@ -218,7 +237,7 @@ export async function getFolderPath(
   folderId: string,
   rootFolderId: string
 ): Promise<{ id: string; name: string }[]> {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   const path: { id: string; name: string }[] = [];
   let currentId = folderId;
 

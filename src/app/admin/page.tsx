@@ -486,6 +486,7 @@ function SettingsTab() {
   const [settings, setSettings] = useState<{ key: string; value: string; description?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [connectingGoogle, setConnectingGoogle] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/settings")
@@ -506,6 +507,23 @@ function SettingsTab() {
     setSaving(null);
   }
 
+  async function handleConnectGoogle() {
+    setConnectingGoogle(true);
+    try {
+      const res = await fetch("/api/auth/google");
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Erro ao conectar");
+        setConnectingGoogle(false);
+      }
+    } catch {
+      alert("Erro ao conectar com Google");
+      setConnectingGoogle(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-10">
@@ -513,6 +531,13 @@ function SettingsTab() {
       </div>
     );
   }
+
+  const googleConnected = settings.some(
+    (s) => s.key === "google_refresh_token" && s.value
+  );
+  const visibleSettings = settings.filter(
+    (s) => s.key !== "google_refresh_token"
+  );
 
   return (
     <div
@@ -523,8 +548,41 @@ function SettingsTab() {
         Configurações
       </h2>
 
+      <div
+        className="flex items-center justify-between p-4 rounded-lg mb-4"
+        style={{
+          backgroundColor: googleConnected ? "rgba(34,197,94,0.1)" : "var(--bg-secondary)",
+          border: `1px solid ${googleConnected ? "var(--success)" : "var(--border)"}`,
+        }}
+      >
+        <div>
+          <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            Google Drive
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+            {googleConnected
+              ? "Conectado — o Atlas pode acessar seus arquivos"
+              : "Não conectado — clique para autorizar o acesso ao Google Drive"}
+          </p>
+        </div>
+        <button
+          onClick={handleConnectGoogle}
+          disabled={connectingGoogle}
+          className="px-4 py-2 rounded-lg text-sm font-medium text-white shrink-0"
+          style={{
+            backgroundColor: googleConnected ? "var(--success)" : "var(--accent)",
+          }}
+        >
+          {connectingGoogle
+            ? "Conectando..."
+            : googleConnected
+              ? "Reconectar"
+              : "Conectar Google Drive"}
+        </button>
+      </div>
+
       <div className="space-y-4">
-        {settings.map((setting) => (
+        {visibleSettings.map((setting) => (
           <div
             key={setting.key}
             className="flex flex-col sm:flex-row sm:items-center gap-2 p-4 rounded-lg"
