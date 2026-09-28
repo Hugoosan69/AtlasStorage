@@ -1,71 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, getRootFolderId } from "@/lib/auth";
-import { downloadFile, getFileMetadata } from "@/lib/google-drive";
-import { checkPermission } from "@/lib/permissions";
+import { requireUser } from "@/lib/auth";
+import { openFileStream } from "@/lib/google-drive";
+import { itemAccess } from "@/lib/access";
 import { logAction } from "@/lib/audit";
-import { Readable } from "stream";
+import { errorResponse, HttpError } from "@/lib/api";
 
+const INLINE_SAFE = /^(image\/(png|jpe?g|gif|webp|avif|bmp|svg\+xml)|video\/|audio\/|application\/pdf$)/;
+
+function disposition(type: "inline" | "attachment", name: string) {
+  const ascii = name.replace(/[^\x20-\x7e]|["\\]/g, "_");
+  return `${type}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+}
+
+/**
+ * GET ?fileId=…            download (needs can_download)
+ * GET ?fileId=…&inline=1   in-browser preview (needs can_view)
+ * GET ?fileId=…&check=1    permission check only, so the UI can report errors before navigating
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await requireUser();
-    const rootFolderId = await getRootFolderId();
+    const params = request.nextUrl.searchParams;
+    const inline = params.get("inline") === "1";
 
-    const { searchParams } = new URL(request.url);
-    const fileId = searchParams.get("fileId");
+    const ctx = await itemAccess(user, params.get("fileId"));
+    if (ctx.isFolder || ctx.meta.trashed) throw new HttpError(404, "Arquivo não encontrado");
 
-    if (!fileId) {
-      return NextResponse.json(
-        { error: "fileId é obrigatório" },
-        { status: 400 }
-      );
+    const allowed = inline ? ctx.permissions.can_view : ctx.permissions.can_download;
+    if (!allowed) {
+      throw new HttpError(403, inline ? "Sem permissão para visualizar" : "Sem permissão para baixar");
+    }
+    if (params.get("check") === "1") return NextResponse.json({ ok: true });
+
+    const range = inline ? request.headers.get("range") : null;
+    const file = await openFileStream(ctx.meta.id!, { preview: inline, range });
+
+    if (!range || /^bytes=0-/.test(range)) {
+      await logAction({
+        userId: user.id,
+        userEmail: user.email,
+        action: inline ? "file.view" : "file.download",
+        targetDriveId: ctx.meta.id!,
+        targetName: ctx.meta.name!,
+        targetParentId: ctx.parentId,
+      });
     }
 
-    const metadata = await getFileMetadata(fileId);
-    const parentId = metadata.parents?.[0] || rootFolderId;
+    const headers = new Headers({
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+    });
 
-    const canDownload = await checkPermission(
-      user.id,
-      parentId,
-      "can_download",
-      rootFolderId
-    );
-
-    if (!canDownload) {
-      return NextResponse.json(
-        { error: "Sem permissão para download" },
-        { status: 403 }
-      );
+    if (inline) {
+      // User content is served from our origin: never let it run as a document.
+      const type = INLINE_SAFE.test(file.mimeType) ? file.mimeType : "text/plain; charset=utf-8";
+      headers.set("Content-Type", type);
+      headers.set("Content-Disposition", disposition("inline", file.name));
+      if (type !== "application/pdf") {
+        headers.set("Content-Security-Policy", "sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'");
+      }
+    } else {
+      headers.set("Content-Type", file.mimeType);
+      headers.set("Content-Disposition", disposition("attachment", file.name));
     }
 
-    const { stream, mimeType, name } = await downloadFile(fileId);
+    if (file.rangeable) headers.set("Accept-Ranges", "bytes");
+    if (file.contentLength) headers.set("Content-Length", file.contentLength);
+    if (file.contentRange) headers.set("Content-Range", file.contentRange);
 
-    await logAction({
-      userId: user.id,
-      userEmail: user.email,
-      action: "file.download",
-      targetDriveId: fileId,
-      targetName: name,
-      targetParentId: parentId,
-    });
-
-    const nodeStream = stream as unknown as Readable;
-    const webStream = new ReadableStream({
-      start(controller) {
-        nodeStream.on("data", (chunk: Buffer) => controller.enqueue(chunk));
-        nodeStream.on("end", () => controller.close());
-        nodeStream.on("error", (err: Error) => controller.error(err));
-      },
-    });
-
-    return new Response(webStream, {
-      headers: {
-        "Content-Type": mimeType,
-        "Content-Disposition": `attachment; filename="${name.replace(/[^\x20-\x7e]|"/g, "_")}"; filename*=UTF-8''${encodeURIComponent(name)}`,
-      },
-    });
+    return new Response(file.body, { status: file.status, headers });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Erro interno do servidor";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error);
   }
 }

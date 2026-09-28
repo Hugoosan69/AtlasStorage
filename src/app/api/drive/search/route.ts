@@ -1,42 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getRootFolderId } from "@/lib/auth";
 import { searchFiles } from "@/lib/google-drive";
-import { getUserPermissions } from "@/lib/permissions";
+import { canSeeFolder, loadAccess, resolve } from "@/lib/permissions";
+import { errorResponse, HttpError } from "@/lib/api";
+import { thumbnailUrl } from "@/lib/sign";
+import type { DriveItem } from "@/types";
 
 export async function GET(request: NextRequest) {
   try {
     const user = await requireUser();
-    const rootFolderId = await getRootFolderId();
+    const rootId = await getRootFolderId();
 
-    const query = new URL(request.url).searchParams.get("q");
+    const query = request.nextUrl.searchParams.get("q")?.trim();
     if (!query || query.length < 2) {
-      return NextResponse.json(
-        { error: "Pesquisa deve ter pelo menos 2 caracteres" },
-        { status: 400 }
-      );
+      throw new HttpError(400, "Pesquisa deve ter pelo menos 2 caracteres");
     }
 
-    const files = await searchFiles(query, rootFolderId);
-    if (user.role === "admin") return NextResponse.json({ files });
+    const [results, access] = await Promise.all([
+      searchFiles(query, rootId),
+      loadAccess(user, rootId),
+    ]);
 
-    const viewCache = new Map<string, boolean>();
-    const canView = async (folderId: string) => {
-      if (!viewCache.has(folderId)) {
-        const perms = await getUserPermissions(user.id, folderId, rootFolderId);
-        viewCache.set(folderId, perms.can_view);
-      }
-      return viewCache.get(folderId)!;
-    };
-
-    const visible = [];
-    for (const file of files) {
-      const target = file.isFolder ? file.id : file.parents?.[0] || rootFolderId;
-      if (await canView(target)) visible.push(file);
+    const files: DriveItem[] = [];
+    for (const { item, parentChain, parentName } of results) {
+      const visible = item.isFolder
+        ? await canSeeFolder(access, [...parentChain, item.id])
+        : resolve(access, parentChain).can_view;
+      if (!visible) continue;
+      files.push({
+        ...item,
+        thumb: item.hasThumbnail ? thumbnailUrl(item.id) : undefined,
+        parentId: parentChain[parentChain.length - 1],
+        parentName,
+      });
     }
-    return NextResponse.json({ files: visible });
+
+    return NextResponse.json({ files });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Erro interno do servidor";
-    const status = message === "Unauthorized" ? 401 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return errorResponse(error);
   }
 }

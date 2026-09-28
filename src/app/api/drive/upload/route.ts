@@ -1,44 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, getRootFolderId } from "@/lib/auth";
-import { createUploadSession } from "@/lib/google-drive";
-import { checkPermission } from "@/lib/permissions";
+import { requireUser } from "@/lib/auth";
+import { createUploadSession, isFolder } from "@/lib/google-drive";
+import { folderAccess } from "@/lib/access";
 import { logAction } from "@/lib/audit";
+import { errorResponse, HttpError, validName } from "@/lib/api";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireUser();
-    const rootFolderId = await getRootFolderId();
-
     const { parentId, name, mimeType, size } = await request.json();
+    if (typeof size !== "number" || size < 0) throw new HttpError(400, "Tamanho inválido");
+    const fileName = validName(name);
 
-    if (!parentId || !name || typeof size !== "number") {
-      return NextResponse.json(
-        { error: "parentId, name e size são obrigatórios" },
-        { status: 400 }
-      );
-    }
+    const ctx = await folderAccess(user, parentId);
+    if (!(await isFolder(parentId))) throw new HttpError(404, "Pasta não encontrada");
+    if (!ctx.permissions.can_upload) throw new HttpError(403, "Sem permissão para enviar arquivos aqui");
 
-    const canUpload = await checkPermission(user.id, parentId, "can_upload", rootFolderId);
-    if (!canUpload) {
-      return NextResponse.json({ error: "Sem permissão para upload" }, { status: 403 });
-    }
-
-    const origin = request.headers.get("origin") || new URL(request.url).origin;
-    const uploadUrl = await createUploadSession(parentId, name, mimeType, size, origin);
+    const origin = request.headers.get("origin") || request.nextUrl.origin;
+    const type = typeof mimeType === "string" && mimeType ? mimeType : "application/octet-stream";
+    const uploadUrl = await createUploadSession(parentId, fileName, type, size, origin);
 
     await logAction({
       userId: user.id,
       userEmail: user.email,
       action: "file.upload",
-      targetName: name,
+      targetName: fileName,
       targetParentId: parentId,
-      details: { size, mimeType },
+      details: { size, mimeType: type },
     });
 
     return NextResponse.json({ uploadUrl });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Erro interno do servidor";
-    const status = message === "Unauthorized" ? 401 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return errorResponse(error);
   }
 }

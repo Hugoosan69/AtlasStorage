@@ -1,21 +1,46 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
-import { FolderOpen, Shield, LogOut, Menu, X } from "lucide-react";
+import { FolderOpen, Shield, LogOut, Menu as MenuIcon, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ToastProvider } from "@/components/ui/Toast";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { FolderTree } from "@/components/file-browser/FolderTree";
 import type { AppUser } from "@/types";
+
+export function avatarColor(seed: string) {
+  let hash = 0;
+  for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+  return `hsl(${Math.abs(hash) % 360} 62% 52%)`;
+}
+
+export function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 export function AppShell({ user, children }: { user: AppUser; children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [drawer, setDrawer] = useState(false);
+
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawer]);
 
   async function logout() {
     await createClient().auth.signOut();
-    router.push("/login");
+    router.replace("/login");
     router.refresh();
   }
 
@@ -24,53 +49,45 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
     { href: "/admin", label: "Administração", icon: Shield, show: user.role === "admin" },
   ].filter((n) => n.show);
 
-  const initials = user.name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const onFiles = pathname === "/";
 
   const sidebar = (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2.5 px-5 h-16">
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-          style={{ background: "linear-gradient(135deg, var(--accent), #a855f7)" }}
-        >
-          A
-        </div>
+      <div className="flex items-center gap-2.5 px-4 h-14 shrink-0">
+        <div className="brand-mark">A</div>
         <span className="font-semibold text-[15px] tracking-tight">Atlas</span>
       </div>
 
-      <nav className="flex-1 px-3 py-2 space-y-0.5">
+      <nav className="px-2.5 space-y-0.5 shrink-0">
         {nav.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+          const active = href === "/" ? onFiles : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 px-3 h-9 rounded-lg text-sm font-medium transition-colors"
-              style={{
-                background: active ? "var(--accent-soft)" : "transparent",
-                color: active ? "var(--accent)" : "var(--text-2)",
-              }}
+              onClick={() => setDrawer(false)}
+              className="nav-link"
+              data-active={active}
             >
-              <Icon size={17} />
+              <Icon size={17} strokeWidth={1.9} />
               {label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-3" style={{ borderTop: "1px solid var(--border)" }}>
-        <div className="flex items-center gap-3 px-2 py-2">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-            style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
-          >
-            {initials}
+      <div className="flex-1 min-h-0 overflow-y-auto px-2.5 pt-4 pb-3">
+        {onFiles && (
+          <Suspense>
+            <FolderTree onNavigate={() => setDrawer(false)} />
+          </Suspense>
+        )}
+      </div>
+
+      <div className="p-2.5 shrink-0" style={{ borderTop: "1px solid var(--border)" }}>
+        <div className="flex items-center gap-2.5 px-1.5 py-1.5">
+          <div className="avatar" style={{ background: avatarColor(user.email) }}>
+            {initials(user.name)}
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium truncate">{user.name}</div>
@@ -82,6 +99,10 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
             <LogOut size={17} />
           </button>
         </div>
+        <div className="flex items-center justify-between px-1.5 pt-1.5">
+          <span className="text-xs" style={{ color: "var(--text-3)" }}>Aparência</span>
+          <ThemeToggle />
+        </div>
       </div>
     </div>
   );
@@ -89,22 +110,20 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
   return (
     <ToastProvider>
       <div className="flex h-dvh overflow-hidden">
-        <aside
-          className="hidden md:block w-60 shrink-0"
-          style={{ background: "var(--surface)", borderRight: "1px solid var(--border)" }}
-        >
-          {sidebar}
-        </aside>
+        <aside className="sidebar hidden md:block w-64 shrink-0">{sidebar}</aside>
 
-        {open && (
-          <div className="md:hidden fixed inset-0 z-40 flex" onClick={() => setOpen(false)}>
-            <div className="absolute inset-0" style={{ background: "rgb(0 0 0 / 0.4)" }} />
+        {drawer && (
+          <div className="md:hidden fixed inset-0 z-50" onClick={() => setDrawer(false)}>
+            <div className="absolute inset-0 backdrop" />
             <aside
-              className="relative w-64 h-full animate-pop"
-              style={{ background: "var(--surface)" }}
+              className="sidebar absolute inset-y-0 left-0 w-72 max-w-[85vw] animate-drawer"
               onClick={(e) => e.stopPropagation()}
             >
-              <button className="btn btn-ghost btn-icon absolute right-2 top-3.5" onClick={() => setOpen(false)} aria-label="Fechar menu">
+              <button
+                className="btn btn-ghost btn-icon absolute right-2 top-2.5 z-10"
+                onClick={() => setDrawer(false)}
+                aria-label="Fechar menu"
+              >
                 <X size={18} />
               </button>
               {sidebar}
@@ -113,15 +132,13 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
         )}
 
         <div className="flex-1 min-w-0 flex flex-col">
-          <div
-            className="md:hidden flex items-center gap-2 px-3 h-14 shrink-0"
-            style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}
-          >
-            <button className="btn btn-ghost btn-icon" onClick={() => setOpen(true)} aria-label="Abrir menu">
-              <Menu size={20} />
+          <header className="md:hidden flex items-center gap-2 px-2 h-14 shrink-0 topbar">
+            <button className="btn btn-ghost btn-icon" onClick={() => setDrawer(true)} aria-label="Abrir menu">
+              <MenuIcon size={20} />
             </button>
+            <div className="brand-mark !w-7 !h-7 !text-xs">A</div>
             <span className="font-semibold">Atlas</span>
-          </div>
+          </header>
           <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
         </div>
       </div>

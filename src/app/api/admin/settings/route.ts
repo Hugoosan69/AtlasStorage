@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { clearRootFolderCache, requireAdmin } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { errorResponse, HttpError } from "@/lib/api";
 
 export async function GET() {
   try {
@@ -14,9 +15,7 @@ export async function GET() {
       )
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Erro interno";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error);
   }
 }
 
@@ -26,22 +25,18 @@ export async function PATCH(request: NextRequest) {
     const supabase = await createServiceClient();
     const { key, value } = await request.json();
 
-    if (!key || key === "google_refresh_token") {
-      return NextResponse.json(
-        { error: "key é obrigatório" },
-        { status: 400 }
-      );
+    if (typeof key !== "string" || !key || key === "google_refresh_token") {
+      throw new HttpError(400, "Configuração inválida");
     }
 
     const { error } = await supabase
       .from("settings")
       .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
-
     if (error) throw error;
+
+    if (key === "root_folder_id") clearRootFolderCache();
     return NextResponse.json({ success: true });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Erro interno";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error);
   }
 }

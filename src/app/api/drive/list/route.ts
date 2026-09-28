@@ -1,61 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getRootFolderId } from "@/lib/auth";
-import { listFolder, getFolderPath } from "@/lib/google-drive";
-import { getUserPermissions } from "@/lib/permissions";
+import { getFolderPath, isFolder, listFolder } from "@/lib/google-drive";
+import { canSeeFolder, loadAccess, resolve } from "@/lib/permissions";
+import { errorResponse, HttpError } from "@/lib/api";
+import { thumbnailUrl } from "@/lib/sign";
+import type { DriveItem, FolderListing } from "@/types";
 
 export async function GET(request: NextRequest) {
   try {
     const user = await requireUser();
-    const rootFolderId = await getRootFolderId();
+    const rootId = await getRootFolderId();
+    const folderId = request.nextUrl.searchParams.get("folderId") || rootId;
 
-    const { searchParams } = new URL(request.url);
-    const folderId = searchParams.get("folderId") || rootFolderId;
-    const pageToken = searchParams.get("pageToken") || undefined;
-
-    const permissions = await getUserPermissions(
-      user.id,
-      folderId,
-      rootFolderId
-    );
-
-    if (!permissions.can_view) {
-      return NextResponse.json(
-        { error: "Sem permissão para acessar esta pasta" },
-        { status: 403 }
-      );
-    }
-
-    const [result, breadcrumb] = await Promise.all([
-      listFolder(folderId, pageToken),
-      getFolderPath(folderId, rootFolderId),
+    const [path, access] = await Promise.all([
+      getFolderPath(folderId, rootId),
+      loadAccess(user, rootId),
     ]);
+    if (!path || !(await isFolder(folderId))) throw new HttpError(404, "Pasta não encontrada");
 
-    const visibleFiles = [];
-    for (const file of result.files) {
-      if (file.isFolder) {
-        const folderPerms = await getUserPermissions(
-          user.id,
-          file.id,
-          rootFolderId
-        );
-        if (folderPerms.can_view) {
-          visibleFiles.push(file);
-        }
-      } else {
-        visibleFiles.push(file);
-      }
+    const chain = path.map((p) => p.id);
+    const permissions = resolve(access, chain);
+    if (!(await canSeeFolder(access, chain))) {
+      throw new HttpError(403, "Você não tem acesso a esta pasta");
     }
 
-    return NextResponse.json({
-      files: visibleFiles,
-      nextPageToken: result.nextPageToken,
-      breadcrumb,
+    const items = await listFolder(folderId);
+    const files: DriveItem[] = [];
+    for (const item of items) {
+      const visible = item.isFolder
+        ? await canSeeFolder(access, [...chain, item.id])
+        : permissions.can_view;
+      if (!visible) continue;
+      files.push(item.hasThumbnail ? { ...item, thumb: thumbnailUrl(item.id) } : item);
+    }
+
+    const body: FolderListing = {
+      folder: path[path.length - 1],
+      breadcrumb: path,
       permissions,
-    });
+      limited: !permissions.can_view,
+      files,
+    };
+    return NextResponse.json(body);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Erro interno do servidor";
-    const status = message === "Unauthorized" ? 401 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return errorResponse(error);
   }
 }

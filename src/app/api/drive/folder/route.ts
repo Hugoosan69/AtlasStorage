@@ -1,52 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, getRootFolderId } from "@/lib/auth";
-import { createFolder } from "@/lib/google-drive";
-import { checkPermission } from "@/lib/permissions";
+import { requireUser } from "@/lib/auth";
+import { createFolder, isFolder } from "@/lib/google-drive";
+import { folderAccess } from "@/lib/access";
 import { logAction } from "@/lib/audit";
+import { errorResponse, HttpError, validName } from "@/lib/api";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireUser();
-    const rootFolderId = await getRootFolderId();
-
     const { parentId, name } = await request.json();
+    const folderName = validName(name);
 
-    if (!parentId || !name) {
-      return NextResponse.json(
-        { error: "parentId e name são obrigatórios" },
-        { status: 400 }
-      );
-    }
+    const ctx = await folderAccess(user, parentId);
+    if (!(await isFolder(parentId))) throw new HttpError(404, "Pasta não encontrada");
+    if (!ctx.permissions.can_create_folder) throw new HttpError(403, "Sem permissão para criar pastas aqui");
 
-    const canCreate = await checkPermission(
-      user.id,
-      parentId,
-      "can_create_folder",
-      rootFolderId
-    );
-
-    if (!canCreate) {
-      return NextResponse.json(
-        { error: "Sem permissão para criar pastas" },
-        { status: 403 }
-      );
-    }
-
-    const result = await createFolder(parentId, name);
+    const folder = await createFolder(parentId, folderName);
 
     await logAction({
       userId: user.id,
       userEmail: user.email,
       action: "folder.create",
-      targetDriveId: result.id!,
-      targetName: name,
+      targetDriveId: folder.id,
+      targetName: folderName,
       targetParentId: parentId,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json(folder);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Erro interno do servidor";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error);
   }
 }

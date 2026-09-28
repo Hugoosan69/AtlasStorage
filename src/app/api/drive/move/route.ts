@@ -1,57 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, getRootFolderId } from "@/lib/auth";
-import { moveItem, getFileMetadata } from "@/lib/google-drive";
-import { checkPermission } from "@/lib/permissions";
+import { requireUser } from "@/lib/auth";
+import { isFolder, moveItem } from "@/lib/google-drive";
+import { itemAccess } from "@/lib/access";
+import { getChain, resolve } from "@/lib/permissions";
 import { logAction } from "@/lib/audit";
+import { errorResponse, HttpError } from "@/lib/api";
 
 export async function PATCH(request: NextRequest) {
   try {
     const user = await requireUser();
-    const rootFolderId = await getRootFolderId();
-
     const { fileId, newParentId } = await request.json();
+    if (typeof newParentId !== "string" || !newParentId) throw new HttpError(400, "Destino não informado");
 
-    if (!fileId || !newParentId) {
-      return NextResponse.json(
-        { error: "fileId e newParentId são obrigatórios" },
-        { status: 400 }
-      );
+    const ctx = await itemAccess(user, fileId);
+    if (newParentId === ctx.parentId) throw new HttpError(400, "O item já está nesta pasta");
+
+    const targetChain = await getChain(newParentId, ctx.rootId);
+    if (!targetChain || !(await isFolder(newParentId))) throw new HttpError(404, "Pasta de destino não encontrada");
+    if (targetChain.includes(fileId)) {
+      throw new HttpError(400, "Não é possível mover uma pasta para dentro dela mesma");
     }
 
-    const metadata = await getFileMetadata(fileId);
-    const currentParentId = metadata.parents?.[0] || rootFolderId;
-    const isFolder =
-      metadata.mimeType === "application/vnd.google-apps.folder";
-    const permission = isFolder ? "can_move_folders" : "can_move_files";
-
-    const [canMoveFrom, canMoveTo] = await Promise.all([
-      checkPermission(user.id, currentParentId, permission, rootFolderId),
-      checkPermission(user.id, newParentId, "can_upload", rootFolderId),
-    ]);
-
-    if (!canMoveFrom || !canMoveTo) {
-      return NextResponse.json(
-        { error: "Sem permissão para mover" },
-        { status: 403 }
-      );
+    const canTake = ctx.isFolder ? ctx.permissions.can_move_folders : ctx.permissions.can_move_files;
+    if (!canTake) throw new HttpError(403, "Sem permissão para mover este item");
+    if (!resolve(ctx.access, targetChain).can_upload) {
+      throw new HttpError(403, "Sem permissão para adicionar itens na pasta de destino");
     }
 
-    const result = await moveItem(fileId, newParentId, currentParentId);
+    const result = await moveItem(fileId, newParentId, ctx.parentId);
 
     await logAction({
       userId: user.id,
       userEmail: user.email,
-      action: isFolder ? "folder.move" : "file.move",
+      action: ctx.isFolder ? "folder.move" : "file.move",
       targetDriveId: fileId,
-      targetName: metadata.name!,
+      targetName: ctx.meta.name!,
       targetParentId: newParentId,
-      details: { fromParent: currentParentId },
+      details: { fromParent: ctx.parentId },
     });
 
     return NextResponse.json(result);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Erro interno do servidor";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error);
   }
 }

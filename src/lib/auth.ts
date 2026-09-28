@@ -33,7 +33,11 @@ export async function requireAdmin(): Promise<AppUser> {
   return user;
 }
 
+let rootCache: { id: string; at: number } | null = null;
+
 export async function getRootFolderId(): Promise<string> {
+  if (rootCache && Date.now() - rootCache.at < 30_000) return rootCache.id;
+
   const serviceClient = await createServiceClient();
   const { data } = await serviceClient
     .from("settings")
@@ -42,5 +46,10 @@ export async function getRootFolderId(): Promise<string> {
     .single();
 
   if (!data?.value) throw new Error("Root folder not configured");
+  rootCache = { id: data.value, at: Date.now() };
   return data.value;
+}
+
+export function clearRootFolderCache() {
+  rootCache = null;
 }

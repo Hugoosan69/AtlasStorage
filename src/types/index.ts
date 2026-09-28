@@ -4,10 +4,15 @@ export interface DriveItem {
   mimeType: string;
   size?: string;
   modifiedTime?: string;
-  iconLink?: string;
-  thumbnailLink?: string;
+  createdTime?: string;
   parents?: string[];
   isFolder: boolean;
+  hasThumbnail?: boolean;
+  /** Signed URL for the thumbnail proxy; only present when Drive has a thumbnail. */
+  thumb?: string;
+  /** Search results only: where the item lives. */
+  parentId?: string;
+  parentName?: string;
 }
 
 export interface BreadcrumbItem {
@@ -28,13 +33,25 @@ export interface UserPermissions {
   can_delete_folders: boolean;
 }
 
+export interface FolderListing {
+  folder: BreadcrumbItem;
+  breadcrumb: BreadcrumbItem[];
+  permissions: UserPermissions;
+  /** The user can only pass through this folder to reach folders shared with them. */
+  limited: boolean;
+  files: DriveItem[];
+}
+
 export interface AppUser {
   id: string;
+  auth_id?: string;
   email: string;
   name: string;
   avatar_url?: string;
   role: "admin" | "user";
   is_active: boolean;
+  created_at?: string;
+  last_sign_in_at?: string | null;
 }
 
 export interface Group {
@@ -43,22 +60,12 @@ export interface Group {
   description?: string;
 }
 
-export interface Permission {
+export interface Permission extends UserPermissions {
   id: string;
   user_id?: string;
   group_id?: string;
   folder_drive_id: string;
   folder_name?: string;
-  can_view: boolean;
-  can_download: boolean;
-  can_upload: boolean;
-  can_create_folder: boolean;
-  can_rename_files: boolean;
-  can_rename_folders: boolean;
-  can_move_files: boolean;
-  can_move_folders: boolean;
-  can_delete_files: boolean;
-  can_delete_folders: boolean;
   inherit: boolean;
 }
 
