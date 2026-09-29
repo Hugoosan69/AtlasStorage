@@ -348,20 +348,11 @@ async function getFolderIndex() {
   return map;
 }
 
-export async function searchFiles(query: string, rootFolderId: string) {
-  const drive = await getDriveClient();
-  const index = await getFolderIndex();
-  const escaped = query.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+type Located = { item: DriveItem; parentChain: string[]; parentName: string };
 
-  const { data } = await drive.files.list({
-    q: `name contains '${escaped}' and trashed = false`,
-    fields: `files(${ITEM_FIELDS})`,
-    orderBy: "modifiedTime desc",
-    pageSize: 300,
-  });
-
-  const results: Array<{ item: DriveItem; parentChain: string[]; parentName: string }> = [];
-  for (const file of data.files || []) {
+function locate(files: drive_v3.Schema$File[], index: Map<string, { name: string; parent: string }>, rootFolderId: string) {
+  const results: Located[] = [];
+  for (const file of files) {
     const item = toItem(file);
     const parentId = item.parents?.[0];
     if (!parentId || item.id === rootFolderId) continue;
@@ -383,4 +374,33 @@ export async function searchFiles(query: string, rootFolderId: string) {
     });
   }
   return results;
+}
+
+export async function searchFiles(query: string, rootFolderId: string) {
+  const drive = await getDriveClient();
+  const index = await getFolderIndex();
+  const escaped = query.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+
+  const { data } = await drive.files.list({
+    q: `name contains '${escaped}' and trashed = false`,
+    fields: `files(${ITEM_FIELDS})`,
+    orderBy: "modifiedTime desc",
+    pageSize: 300,
+  });
+  return locate(data.files || [], index, rootFolderId);
+}
+
+/** Trashed items whose original folder still exists inside the Atlas root. */
+export async function listTrashed(rootFolderId: string) {
+  const drive = await getDriveClient();
+  const index = await getFolderIndex();
+  const { data } = await drive.files.list({
+    q: "trashed = true",
+    fields: `files(${ITEM_FIELDS}, trashedTime)`,
+    pageSize: 500,
+  });
+  const trashedAt = new Map((data.files || []).map((f) => [f.id!, f.trashedTime || f.modifiedTime || ""]));
+  return locate(data.files || [], index, rootFolderId)
+    .map((r) => ({ ...r, trashedTime: trashedAt.get(r.item.id) || "" }))
+    .sort((a, b) => b.trashedTime.localeCompare(a.trashedTime));
 }

@@ -35,9 +35,11 @@ export async function GET(request: NextRequest) {
     const supabase = await createServiceClient();
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
+    const groupId = searchParams.get("groupId");
 
     let query = supabase.from("permissions").select("*");
     if (userId) query = query.eq("user_id", userId);
+    if (groupId) query = query.eq("group_id", groupId);
 
     const { data, error } = await query.order("created_at", { ascending: false });
     if (error) throw error;

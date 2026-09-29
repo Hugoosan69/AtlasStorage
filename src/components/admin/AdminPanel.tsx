@@ -19,6 +19,7 @@ import {
   Trash2,
   Upload,
   Users,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { ConfirmModal, Modal } from "@/components/ui/Modal";
@@ -32,6 +33,7 @@ import type { AppUser, AuditLog, Permission, UserPermissions } from "@/types";
 
 const TABS = [
   { id: "users", label: "Usuários", icon: Users },
+  { id: "groups", label: "Grupos", icon: UsersRound },
   { id: "permissions", label: "Permissões", icon: KeyRound },
   { id: "activity", label: "Atividade", icon: Activity },
   { id: "settings", label: "Configurações", icon: Settings },
@@ -104,6 +106,7 @@ export function AdminPanel({ currentUser }: { currentUser: AppUser }) {
             }}
           />
         )}
+        {tab === "groups" && <GroupsTab />}
         {tab === "permissions" && <PermissionsTab initialUser={focusUser} />}
         {tab === "activity" && <ActivityTab />}
         {tab === "settings" && <SettingsTab />}
@@ -369,6 +372,202 @@ function UserModal({
   );
 }
 
+/* ---------------- Groups ---------------- */
+
+interface GroupRow {
+  id: string;
+  name: string;
+  description?: string | null;
+  members: string[];
+}
+
+function GroupsTab() {
+  const toast = useToast();
+  const [groups, setGroups] = useState<GroupRow[] | null>(null);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [editing, setEditing] = useState<GroupRow | "new" | null>(null);
+  const [removing, setRemoving] = useState<GroupRow | null>(null);
+
+  const load = useCallback(() => {
+    Promise.all([api<GroupRow[]>("/api/admin/groups"), api<AppUser[]>("/api/admin/users")])
+      .then(([g, u]) => {
+        setGroups(g);
+        setUsers(u.filter((x) => x.role !== "admin"));
+      })
+      .catch((e) => toast(e.message, "error"));
+  }, [toast]);
+  useEffect(load, [load]);
+
+  if (!groups) return <Spinner />;
+
+  return (
+    <>
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between mb-4">
+        <p className="text-sm" style={{ color: "var(--text-2)" }}>
+          Agrupe pessoas do mesmo setor e libere pastas para o grupo inteiro na aba Permissões.
+        </p>
+        <button className="btn btn-primary shrink-0" onClick={() => setEditing("new")}>
+          <Plus size={16} /> Novo grupo
+        </button>
+      </div>
+
+      {groups.length === 0 ? (
+        <div className="card p-10 text-center">
+          <div className="empty-icon mx-auto"><UsersRound size={26} strokeWidth={1.6} /></div>
+          <p className="font-medium">Nenhum grupo criado</p>
+          <p className="text-sm mt-1" style={{ color: "var(--text-2)" }}>Exemplo: Financeiro, Marketing, RH.</p>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-3">
+          {groups.map((g) => {
+            const members = users.filter((u) => g.members.includes(u.id));
+            return (
+              <div key={g.id} className="card p-4 sm:p-5 flex flex-col">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
+                    <UsersRound size={19} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold truncate">{g.name}</div>
+                    <div className="text-xs truncate" style={{ color: "var(--text-3)" }}>
+                      {g.description || `${members.length} membro(s)`}
+                    </div>
+                  </div>
+                  <button className="btn btn-ghost btn-icon" onClick={() => setEditing(g)} aria-label={`Editar ${g.name}`}>
+                    <Pencil size={16} />
+                  </button>
+                  <button className="btn btn-ghost btn-icon" style={{ color: "var(--danger)" }} onClick={() => setRemoving(g)} aria-label={`Excluir ${g.name}`}>
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-4">
+                  {members.length === 0 ? (
+                    <span className="text-xs" style={{ color: "var(--text-3)" }}>Sem membros</span>
+                  ) : (
+                    members.map((u) => (
+                      <span key={u.id} className="inline-flex items-center gap-1.5 h-7 pl-1 pr-2.5 rounded-full text-xs" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                        <Avatar user={u} size={20} />
+                        {u.name}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <GroupModal
+        target={editing}
+        users={users}
+        onClose={() => setEditing(null)}
+        onSaved={() => {
+          setEditing(null);
+          load();
+        }}
+      />
+      <ConfirmModal
+        open={!!removing}
+        title="Excluir grupo?"
+        danger
+        confirmText="Excluir grupo"
+        message={<>O grupo <strong style={{ color: "var(--text)" }}>{removing?.name}</strong> e as pastas liberadas para ele serão removidos. Os usuários continuam existindo.</>}
+        onClose={() => setRemoving(null)}
+        onConfirm={async () => {
+          try {
+            await api(`/api/admin/groups?id=${removing!.id}`, { method: "DELETE" });
+            toast("Grupo excluído", "success");
+            setRemoving(null);
+            load();
+          } catch (e) {
+            toast(e instanceof Error ? e.message : "Erro", "error");
+          }
+        }}
+      />
+    </>
+  );
+}
+
+function GroupModal({
+  target,
+  users,
+  onClose,
+  onSaved,
+}: {
+  target: GroupRow | "new" | null;
+  users: AppUser[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [form, setForm] = useState({ name: "", description: "", members: [] as string[] });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!target) return;
+    setForm(
+      target === "new"
+        ? { name: "", description: "", members: [] }
+        : { name: target.name, description: target.description || "", members: target.members }
+    );
+  }, [target]);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      if (target === "new") await api("/api/admin/groups", { method: "POST", json: form });
+      else if (target) await api("/api/admin/groups", { method: "PATCH", json: { id: target.id, ...form } });
+      toast("Grupo salvo", "success");
+      onSaved();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Erro", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const toggle = (id: string) =>
+    setForm((f) => ({ ...f, members: f.members.includes(id) ? f.members.filter((m) => m !== id) : [...f.members, id] }));
+
+  return (
+    <Modal open={!!target} title={target === "new" ? "Novo grupo" : "Editar grupo"} onClose={onClose}>
+      <form onSubmit={save} className="space-y-4">
+        <div>
+          <label className="label" htmlFor="g-name">Nome</label>
+          <input id="g-name" className="input" required maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="ex.: Financeiro" />
+        </div>
+        <div>
+          <label className="label" htmlFor="g-desc">Descrição (opcional)</label>
+          <input id="g-desc" className="input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        </div>
+        <div>
+          <div className="label">Membros</div>
+          {users.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>Nenhum usuário comum cadastrado.</p>
+          ) : (
+            <div className="max-h-56 overflow-y-auto rounded-xl" style={{ border: "1px solid var(--border)" }}>
+              {users.map((u) => (
+                <label key={u.id} className="flex items-center gap-3 px-3 h-11 text-sm cursor-pointer select-none" style={{ borderBottom: "1px solid var(--border)" }}>
+                  <input type="checkbox" className="w-4 h-4" style={{ accentColor: "var(--accent)" }} checked={form.members.includes(u.id)} onChange={() => toggle(u.id)} />
+                  <Avatar user={u} size={24} />
+                  <span className="flex-1 truncate">{u.name}</span>
+                  <span className="text-xs" style={{ color: "var(--text-3)" }}>@{u.username}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" disabled={busy}>{busy ? "Salvando..." : "Salvar"}</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 /* ---------------- Permissions ---------------- */
 
 const PERM_FIELDS: Array<{ key: keyof UserPermissions; label: string }> = [
@@ -419,26 +618,36 @@ function presetOf(p: Permission) {
 function PermissionsTab({ initialUser }: { initialUser: string | null }) {
   const toast = useToast();
   const [users, setUsers] = useState<AppUser[] | null>(null);
-  const [userId, setUserId] = useState("");
+  const [groups, setGroups] = useState<GroupRow[]>([]);
+  const [subject, setSubject] = useState("");
   const [perms, setPerms] = useState<Permission[] | null>(null);
   const [picking, setPicking] = useState(false);
   const [removing, setRemoving] = useState<Permission | null>(null);
 
   useEffect(() => {
-    api<AppUser[]>("/api/admin/users")
-      .then((all) => {
+    Promise.all([api<AppUser[]>("/api/admin/users"), api<GroupRow[]>("/api/admin/groups")])
+      .then(([all, grs]) => {
         const regular = all.filter((u) => u.role !== "admin");
         setUsers(regular);
-        setUserId(regular.find((u) => u.id === initialUser)?.id ?? regular[0]?.id ?? "");
+        setGroups(grs);
+        const first = regular.find((u) => u.id === initialUser) ?? regular[0];
+        setSubject(first ? `u:${first.id}` : grs[0] ? `g:${grs[0].id}` : "");
       })
       .catch((e) => toast(e.message, "error"));
   }, [toast, initialUser]);
 
+  const [kind, subjectId] = subject.split(":") as ["u" | "g", string];
+  const subjectName =
+    kind === "g" ? `o grupo ${groups.find((g) => g.id === subjectId)?.name ?? ""}` : users?.find((u) => u.id === subjectId)?.name;
+
   const load = useCallback(() => {
-    if (!userId) return;
+    if (!subject) return;
+    const [k, id] = subject.split(":");
     setPerms(null);
-    api<Permission[]>(`/api/admin/permissions?userId=${userId}`).then(setPerms).catch((e) => toast(e.message, "error"));
-  }, [userId, toast]);
+    api<Permission[]>(`/api/admin/permissions?${k === "g" ? "groupId" : "userId"}=${id}`)
+      .then(setPerms)
+      .catch((e) => toast(e.message, "error"));
+  }, [subject, toast]);
   useEffect(load, [load]);
 
   async function update(p: Permission, changes: Partial<Permission>) {
@@ -460,7 +669,7 @@ function PermissionsTab({ initialUser }: { initialUser: string | null }) {
     try {
       await api("/api/admin/permissions", {
         method: "POST",
-        json: { user_id: userId, folder_drive_id: folderId, folder_name: folderName, ...PRESETS[1].perms, inherit: true },
+        json: { [kind === "g" ? "group_id" : "user_id"]: subjectId, folder_drive_id: folderId, folder_name: folderName, ...PRESETS[1].perms, inherit: true },
       });
       toast(`Acesso a "${folderName}" liberado`, "success");
       setPicking(false);
@@ -471,7 +680,7 @@ function PermissionsTab({ initialUser }: { initialUser: string | null }) {
   }
 
   if (!users) return <Spinner />;
-  if (users.length === 0) {
+  if (users.length === 0 && groups.length === 0) {
     return (
       <div className="card p-10 text-center">
         <p className="font-medium">Nenhum usuário comum cadastrado</p>
@@ -480,15 +689,16 @@ function PermissionsTab({ initialUser }: { initialUser: string | null }) {
     );
   }
 
-  const person = users.find((u) => u.id === userId);
-
   return (
     <div className="grid md:grid-cols-[15rem_1fr] gap-6">
       <div className="md:hidden">
-        <label className="label" htmlFor="perm-user">Usuário</label>
-        <select id="perm-user" className="input" value={userId} onChange={(e) => setUserId(e.target.value)}>
+        <label className="label" htmlFor="perm-user">Usuário ou grupo</label>
+        <select id="perm-user" className="input" value={subject} onChange={(e) => setSubject(e.target.value)}>
           {users.map((u) => (
-            <option key={u.id} value={u.id}>{u.name}</option>
+            <option key={u.id} value={`u:${u.id}`}>{u.name}</option>
+          ))}
+          {groups.map((g) => (
+            <option key={g.id} value={`g:${g.id}`}>Grupo: {g.name}</option>
           ))}
         </select>
       </div>
@@ -496,9 +706,9 @@ function PermissionsTab({ initialUser }: { initialUser: string | null }) {
         {users.map((u) => (
           <button
             key={u.id}
-            onClick={() => setUserId(u.id)}
+            onClick={() => setSubject(`u:${u.id}`)}
             className="w-full flex items-center gap-2.5 text-left px-2.5 py-2 rounded-lg text-sm transition-colors"
-            style={{ background: userId === u.id ? "var(--selected)" : "transparent" }}
+            style={{ background: subject === `u:${u.id}` ? "var(--selected)" : "transparent" }}
           >
             <Avatar user={u} size={30} />
             <div className="min-w-0">
@@ -507,12 +717,33 @@ function PermissionsTab({ initialUser }: { initialUser: string | null }) {
             </div>
           </button>
         ))}
+        {groups.length > 0 && (
+          <div className="px-2.5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+            Grupos
+          </div>
+        )}
+        {groups.map((g) => (
+          <button
+            key={g.id}
+            onClick={() => setSubject(`g:${g.id}`)}
+            className="w-full flex items-center gap-2.5 text-left px-2.5 py-2 rounded-lg text-sm transition-colors"
+            style={{ background: subject === `g:${g.id}` ? "var(--selected)" : "transparent" }}
+          >
+            <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
+              <UsersRound size={15} />
+            </div>
+            <div className="min-w-0">
+              <div className="font-medium truncate">{g.name}</div>
+              <div className="text-xs truncate" style={{ color: "var(--text-3)" }}>{g.members.length} membro(s)</div>
+            </div>
+          </button>
+        ))}
       </div>
 
       <div className="min-w-0">
         <div className="flex justify-between items-start mb-4 gap-3">
           <div>
-            <h2 className="font-semibold">Pastas liberadas para {person?.name}</h2>
+            <h2 className="font-semibold">Pastas liberadas para {subjectName}</h2>
             <p className="text-sm mt-0.5" style={{ color: "var(--text-2)" }}>
               As permissões valem para a pasta e, se marcado, para todas as subpastas.
             </p>
@@ -627,7 +858,7 @@ function PermissionsTab({ initialUser }: { initialUser: string | null }) {
         confirmText="Remover"
         message={
           <>
-            {person?.name} perderá o acesso a <strong style={{ color: "var(--text)" }}>{removing?.folder_name}</strong>.
+            {subjectName} perderá o acesso a <strong style={{ color: "var(--text)" }}>{removing?.folder_name}</strong>.
           </>
         }
         onClose={() => setRemoving(null)}

@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { FolderOpen, Shield, LogOut, Menu as MenuIcon, X } from "lucide-react";
+import { FolderOpen, Shield, LogOut, Menu as MenuIcon, X, Trash2, KeyRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { FolderTree } from "@/components/file-browser/FolderTree";
+import { PasswordModal } from "@/components/PasswordModal";
 import type { AppUser } from "@/types";
 
 export function avatarColor(seed: string) {
@@ -30,6 +31,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
   const pathname = usePathname();
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   useEffect(() => {
     if (!drawer) return;
@@ -46,6 +48,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
 
   const nav = [
     { href: "/", label: "Arquivos", icon: FolderOpen, show: true },
+    { href: "/lixeira", label: "Lixeira", icon: Trash2, show: true },
     { href: "/admin", label: "Administração", icon: Shield, show: user.role === "admin" },
   ].filter((n) => n.show);
 
@@ -96,9 +99,12 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium truncate">{user.name}</div>
             <div className="text-xs truncate" style={{ color: "var(--text-3)" }}>
-              {user.role === "admin" ? "Administrador" : "Usuário"}
+              @{user.username}
             </div>
           </div>
+          <button className="btn btn-ghost btn-icon" onClick={() => setPasswordOpen(true)} title="Alterar senha" aria-label="Alterar senha">
+            <KeyRound size={16} />
+          </button>
           <button className="btn btn-ghost btn-icon" onClick={logout} title="Sair" aria-label="Sair">
             <LogOut size={17} />
           </button>
@@ -147,6 +153,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
           <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
         </div>
       </div>
+      <PasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
     </ToastProvider>
   );
 }
