@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
     await logAction({
       userId: user.id,
-      userEmail: user.email,
+      userEmail: user.username,
       action: "file.upload",
       targetName: fileName,
       targetParentId: parentId,

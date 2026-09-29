@@ -31,7 +31,7 @@ export async function PATCH(request: NextRequest) {
 
     await logAction({
       userId: user.id,
-      userEmail: user.email,
+      userEmail: user.username,
       action: ctx.isFolder ? "folder.move" : "file.move",
       targetDriveId: fileId,
       targetName: ctx.meta.name!,

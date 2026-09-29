@@ -18,7 +18,7 @@ export async function DELETE(request: NextRequest) {
 
     await logAction({
       userId: user.id,
-      userEmail: user.email,
+      userEmail: user.username,
       action: ctx.isFolder ? "folder.delete" : "file.delete",
       targetDriveId: ctx.meta.id!,
       targetName: ctx.meta.name!,

@@ -19,7 +19,7 @@ export async function PATCH(request: NextRequest) {
 
     await logAction({
       userId: user.id,
-      userEmail: user.email,
+      userEmail: user.username,
       action: ctx.isFolder ? "folder.rename" : "file.rename",
       targetDriveId: fileId,
       targetName: name,

@@ -9,6 +9,19 @@ function validRole(role: unknown) {
   return role;
 }
 
+function validUsername(value: unknown) {
+  const username = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (!/^[a-z0-9._-]{3,30}$/.test(username)) {
+    throw new HttpError(400, "Usuário deve ter 3 a 30 caracteres: letras, números, ponto, hífen ou _");
+  }
+  return username;
+}
+
+function friendlyDbError(error: { code?: string; message?: string }) {
+  if (error.code === "23505") return new HttpError(400, "Este nome de usuário já está em uso");
+  return error;
+}
+
 function validPassword(password: unknown) {
   if (typeof password !== "string" || password.length < 6) {
     throw new HttpError(400, "A senha precisa ter pelo menos 6 caracteres");
@@ -41,9 +54,16 @@ export async function POST(request: NextRequest) {
     const supabase = await createServiceClient();
     const body = await request.json();
 
-    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const username = validUsername(body.username);
     const name = typeof body.name === "string" ? body.name.trim() : "";
-    if (!email || !name) throw new HttpError(400, "Nome e email são obrigatórios");
+    if (!name) throw new HttpError(400, "Nome é obrigatório");
+    const email =
+      typeof body.email === "string" && body.email.trim()
+        ? body.email.trim().toLowerCase()
+        : `${username}@usuarios.atlas-storage.local`;
+
+    const { data: taken } = await supabase.from("users").select("id").eq("username", username).maybeSingle();
+    if (taken) throw new HttpError(400, "Este nome de usuário já está em uso");
     const password = validPassword(body.password);
     const role = validRole(body.role) || "user";
 
@@ -56,20 +76,20 @@ export async function POST(request: NextRequest) {
       throw new HttpError(
         400,
         /already|registered|exists/i.test(authError.message)
-          ? "Já existe um usuário com este email"
+          ? "Este email já está em uso"
           : authError.message
       );
     }
 
     const { data, error } = await supabase
       .from("users")
-      .insert({ auth_id: authData.user.id, email, name, role })
+      .insert({ auth_id: authData.user.id, username, email, name, role })
       .select()
       .single();
 
     if (error) {
       await supabase.auth.admin.deleteUser(authData.user.id);
-      throw error;
+      throw friendlyDbError(error);
     }
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
@@ -81,7 +101,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const admin = await requireAdmin();
     const supabase = await createServiceClient();
-    const { id, name, role, is_active, password } = await request.json();
+    const { id, name, role, is_active, password, username } = await request.json();
 
     if (!id) throw new HttpError(400, "id é obrigatório");
     const newRole = validRole(role);
@@ -106,6 +126,7 @@ export async function PATCH(request: NextRequest) {
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (typeof name === "string" && name.trim()) updates.name = name.trim();
     if (newRole) updates.role = newRole;
+    if (username !== undefined) updates.username = validUsername(username);
     if (typeof is_active === "boolean") updates.is_active = is_active;
 
     const { data, error } = await supabase
@@ -114,7 +135,7 @@ export async function PATCH(request: NextRequest) {
       .eq("id", id)
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw friendlyDbError(error);
     return NextResponse.json(data);
   } catch (error) {
     return errorResponse(error);

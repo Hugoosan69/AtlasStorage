@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     if (!range || /^bytes=0-/.test(range)) {
       await logAction({
         userId: user.id,
-        userEmail: user.email,
+        userEmail: user.username,
         action: inline ? "file.view" : "file.download",
         targetDriveId: ctx.meta.id!,
         targetName: ctx.meta.name!,

@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     await logAction({
       userId: user.id,
-      userEmail: user.email,
+      userEmail: user.username,
       action: ctx.isFolder ? "folder.restore" : "file.restore",
       targetDriveId: ctx.meta.id!,
       targetName: ctx.meta.name!,

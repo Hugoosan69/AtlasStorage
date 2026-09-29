@@ -6,7 +6,7 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState("");
@@ -25,13 +25,14 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const { error: authError } = await createClient().auth.signInWithPassword({
-      email: email.trim(),
-      password,
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: username.trim(), password }),
     });
 
-    if (authError) {
-      setError("Email ou senha inválidos");
+    if (!res.ok) {
+      setError("Usuário ou senha inválidos");
       setLoading(false);
       return;
     }
@@ -67,7 +68,7 @@ export default function LoginPage() {
 
           <h1 className="text-2xl font-semibold tracking-tight">Entrar</h1>
           <p className="text-sm mt-1 mb-8" style={{ color: "var(--text-2)" }}>
-            Use o email e a senha fornecidos pelo administrador.
+            Use o usuário e a senha fornecidos pelo administrador.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -78,17 +79,20 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label className="label" htmlFor="email">Email</label>
+              <label className="label" htmlFor="username">Usuário</label>
               <input
-                id="email"
-                type="email"
-                autoComplete="email"
+                id="username"
+                type="text"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
                 autoFocus
                 className="input h-11"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="voce@empresa.com"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="seu.usuario"
               />
             </div>
 

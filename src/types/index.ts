@@ -45,6 +45,7 @@ export interface FolderListing {
 export interface AppUser {
   id: string;
   auth_id?: string;
+  username: string;
   email: string;
   name: string;
   avatar_url?: string;

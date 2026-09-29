@@ -159,7 +159,7 @@ function UsersTab({ currentUser, onManagePermissions }: { currentUser: AppUser; 
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    return (users || []).filter((u) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+    return (users || []).filter((u) => !q || u.name.toLowerCase().includes(q) || u.username.includes(q));
   }, [users, filter]);
 
   if (!users) return <Spinner />;
@@ -169,7 +169,7 @@ function UsersTab({ currentUser, onManagePermissions }: { currentUser: AppUser; 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between mb-4">
         <div className="relative sm:w-72">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-3)" }} />
-          <input className="input pl-9" placeholder="Buscar por nome ou email" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <input className="input pl-9" placeholder="Buscar por nome ou usuário" value={filter} onChange={(e) => setFilter(e.target.value)} />
         </div>
         <button className="btn btn-primary" onClick={() => setEditing("new")}>
           <Plus size={16} /> Novo usuário
@@ -199,7 +199,7 @@ function UsersTab({ currentUser, onManagePermissions }: { currentUser: AppUser; 
                   <span className="text-sm font-medium">{u.name}</span>
                   {u.id === currentUser.id && <Badge>Você</Badge>}
                 </div>
-                <div className="text-xs truncate" style={{ color: "var(--text-3)" }}>{u.email}</div>
+                <div className="text-xs truncate" style={{ color: "var(--text-3)" }}>@{u.username}</div>
               </div>
             </div>
             <div className="hidden sm:flex gap-1.5">
@@ -253,15 +253,15 @@ function UserModal({
   const toast = useToast();
   const isNew = target === "new";
   const isSelf = target !== "new" && target?.id === currentUser.id;
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "user", is_active: true });
+  const [form, setForm] = useState({ name: "", username: "", password: "", role: "user", is_active: true });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!target) return;
     setForm(
       target === "new"
-        ? { name: "", email: "", password: "", role: "user", is_active: true }
-        : { name: target.name, email: target.email, password: "", role: target.role, is_active: target.is_active }
+        ? { name: "", username: "", password: "", role: "user", is_active: true }
+        : { name: target.name, username: target.username, password: "", role: target.role, is_active: target.is_active }
     );
   }, [target]);
 
@@ -278,6 +278,7 @@ function UserModal({
           json: {
             id: target.id,
             name: form.name,
+            username: form.username,
             role: form.role,
             is_active: form.is_active,
             password: form.password || undefined,
@@ -301,15 +302,19 @@ function UserModal({
           <input id="u-name" className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </div>
         <div>
-          <label className="label" htmlFor="u-email">Email</label>
+          <label className="label" htmlFor="u-username">Usuário (usado para entrar)</label>
           <input
-            id="u-email"
+            id="u-username"
             className="input"
-            type="email"
             required
-            disabled={!isNew}
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            pattern="[a-zA-Z0-9._\-]{3,30}"
+            title="3 a 30 caracteres: letras, números, ponto, hífen ou _"
+            placeholder="ex.: maria.silva"
+            value={form.username}
+            onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase().replace(/\s+/g, "") })}
           />
         </div>
         <div>
@@ -498,7 +503,7 @@ function PermissionsTab({ initialUser }: { initialUser: string | null }) {
             <Avatar user={u} size={30} />
             <div className="min-w-0">
               <div className="font-medium truncate">{u.name}</div>
-              <div className="text-xs truncate" style={{ color: "var(--text-3)" }}>{u.email}</div>
+              <div className="text-xs truncate" style={{ color: "var(--text-3)" }}>@{u.username}</div>
             </div>
           </button>
         ))}
