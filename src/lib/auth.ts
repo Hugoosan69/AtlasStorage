@@ -45,9 +45,31 @@ export async function getRootFolderId(): Promise<string> {
     .eq("key", "root_folder_id")
     .single();
 
-  if (!data?.value) throw new Error("Root folder not configured");
-  rootCache = { id: data.value, at: Date.now() };
-  return data.value;
+  if (data?.value) {
+    rootCache = { id: data.value, at: Date.now() };
+    return data.value;
+  }
+
+  // Auto-detect: search for a folder named "atlas" in Drive
+  const { autoDetectRootFolder } = await import("@/lib/google-drive");
+  const detectedId = await autoDetectRootFolder();
+  if (detectedId) {
+    await serviceClient
+      .from("settings")
+      .upsert(
+        {
+          key: "root_folder_id",
+          value: detectedId,
+          description: "Pasta raiz do Google Drive (auto-detectada)",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "key" }
+      );
+    rootCache = { id: detectedId, at: Date.now() };
+    return detectedId;
+  }
+
+  throw new Error("Root folder not configured");
 }
 
 export function clearRootFolderCache() {

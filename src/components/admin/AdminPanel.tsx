@@ -1021,6 +1021,19 @@ function SettingsTab() {
     }
   }
 
+  async function detectRoot() {
+    setSaving(true);
+    try {
+      const result = await api<{ id: string; name: string }>("/api/admin/settings/detect-root", { method: "POST" });
+      setRootId(result.id);
+      toast(`Pasta "${result.name}" detectada e configurada`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Erro ao detectar pasta", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveRoot(e: React.FormEvent) {
     e.preventDefault();
     const match = rootId.match(/folders\/([\w-]+)/);
@@ -1067,16 +1080,26 @@ function SettingsTab() {
         </div>
       </div>
 
-      <form onSubmit={saveRoot} className="card p-5">
+      <div className="card p-5">
         <h3 className="font-semibold text-sm">Pasta raiz</h3>
         <p className="text-sm mt-0.5 mb-3" style={{ color: "var(--text-2)" }}>
-          Cole o link ou o ID da pasta Atlas no Google Drive. Tudo o que o Atlas mostra fica dentro dela.
+          {rootId
+            ? <>Pasta configurada: <code className="font-mono text-xs">{rootId}</code></>
+            : "Nenhuma pasta raiz configurada. Clique em detectar para buscar automaticamente."}
         </p>
         <div className="flex flex-col sm:flex-row gap-2">
-          <input className="input font-mono text-xs" value={rootId} onChange={(e) => setRootId(e.target.value)} aria-label="ID da pasta raiz" />
-          <button className="btn btn-primary" disabled={saving || !rootId.trim()}>Salvar</button>
+          <button className="btn btn-primary" onClick={detectRoot} disabled={saving || !connected}>
+            {saving ? "Detectando…" : rootId ? "Re-detectar pasta" : "Detectar pasta Atlas"}
+          </button>
         </div>
-      </form>
+        <details className="mt-3">
+          <summary className="text-xs cursor-pointer" style={{ color: "var(--text-3)" }}>Configurar manualmente</summary>
+          <form onSubmit={saveRoot} className="flex flex-col sm:flex-row gap-2 mt-2">
+            <input className="input font-mono text-xs" value={rootId} onChange={(e) => setRootId(e.target.value)} placeholder="ID ou link da pasta" aria-label="ID da pasta raiz" />
+            <button className="btn" disabled={saving || !rootId.trim()}>Salvar</button>
+          </form>
+        </details>
+      </div>
     </div>
   );
 }

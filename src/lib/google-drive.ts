@@ -56,6 +56,20 @@ async function getDriveClient(): Promise<drive_v3.Drive> {
   return pendingClient;
 }
 
+export async function autoDetectRootFolder(): Promise<string | null> {
+  try {
+    const drive = await getDriveClient();
+    const res = await drive.files.list({
+      q: `name = 'atlas' and mimeType = '${FOLDER_MIME}' and trashed = false`,
+      fields: "files(id, name)",
+      pageSize: 5,
+    });
+    return res.data.files?.[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function toItem(file: drive_v3.Schema$File): DriveItem {
   return {
     id: file.id!,

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, clearRootFolderCache } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { google } from "googleapis";
+import { FOLDER_MIME } from "@/lib/google-drive";
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,6 +43,34 @@ export async function GET(request: NextRequest) {
         },
         { onConflict: "key" }
       );
+
+    // Auto-detect root folder named "atlas" (case-insensitive)
+    try {
+      oauth2Client.setCredentials(tokens);
+      const drive = google.drive({ version: "v3", auth: oauth2Client });
+      const res = await drive.files.list({
+        q: `name = 'atlas' and mimeType = '${FOLDER_MIME}' and trashed = false`,
+        fields: "files(id, name)",
+        pageSize: 5,
+      });
+      const folder = res.data.files?.[0];
+      if (folder?.id) {
+        await supabase
+          .from("settings")
+          .upsert(
+            {
+              key: "root_folder_id",
+              value: folder.id,
+              description: "Pasta raiz do Google Drive (auto-detectada)",
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "key" }
+          );
+        clearRootFolderCache();
+      }
+    } catch (e) {
+      console.error("Auto-detect root folder failed:", e);
+    }
 
     return NextResponse.redirect(
       new URL("/admin?google=connected", request.url)
