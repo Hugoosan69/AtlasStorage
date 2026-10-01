@@ -25,6 +25,8 @@ export interface ItemHandlers {
   onDropOnItem: (item: DriveItem, e: React.DragEvent) => void;
 }
 
+export type GridSize = "sm" | "md" | "lg";
+
 interface ViewProps extends ItemHandlers {
   items: DriveItem[];
   selected: Set<string>;
@@ -34,6 +36,7 @@ interface ViewProps extends ItemHandlers {
   showLocation: boolean;
   selectionMode: boolean;
   touch: boolean;
+  gridSize?: GridSize;
 }
 
 export function Checkbox({
@@ -328,15 +331,28 @@ function FileCard({ item, props }: { item: DriveItem; props: ViewProps }) {
   );
 }
 
+const GRID_COLS: Record<GridSize, string> = {
+  sm: "grid-cols-[repeat(auto-fill,minmax(120px,1fr))]",
+  md: "grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))]",
+  lg: "grid-cols-[repeat(auto-fill,minmax(220px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]",
+};
+
+const FOLDER_COLS: Record<GridSize, string> = {
+  sm: "grid-cols-[repeat(auto-fill,minmax(150px,1fr))]",
+  md: "grid-cols-[repeat(auto-fill,minmax(200px,1fr))]",
+  lg: "grid-cols-[repeat(auto-fill,minmax(250px,1fr))]",
+};
+
 export function GridView(props: ViewProps) {
   const folders = props.items.filter((i) => i.isFolder);
   const files = props.items.filter((i) => !i.isFolder);
+  const sz = props.gridSize ?? "md";
   return (
     <div className={`space-y-6 ${props.touch && !props.selectionMode ? "hide-checks" : ""}`}>
       {folders.length > 0 && (
         <section>
           <h2 className="section-label">Pastas</h2>
-          <div className="grid gap-2.5 grid-cols-[repeat(auto-fill,minmax(200px,1fr))]">
+          <div className={`grid gap-2.5 ${FOLDER_COLS[sz]}`}>
             {folders.map((item) => (
               <FolderTile key={item.id} item={item} props={props} />
             ))}
@@ -346,7 +362,7 @@ export function GridView(props: ViewProps) {
       {files.length > 0 && (
         <section>
           <h2 className="section-label">Arquivos</h2>
-          <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))]">
+          <div className={`grid gap-3 ${GRID_COLS[sz]}`}>
             {files.map((item) => (
               <FileCard key={item.id} item={item} props={props} />
             ))}
@@ -357,10 +373,10 @@ export function GridView(props: ViewProps) {
   );
 }
 
-export function LoadingSkeleton({ view }: { view: "list" | "grid" }) {
+export function LoadingSkeleton({ view, gridSize = "md" }: { view: "list" | "grid"; gridSize?: GridSize }) {
   if (view === "grid") {
     return (
-      <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))]">
+      <div className={`grid gap-3 ${GRID_COLS[gridSize]}`}>
         {Array.from({ length: 12 }, (_, i) => (
           <div key={i} className="file-card !cursor-default">
             <div className="card-thumb skeleton" />

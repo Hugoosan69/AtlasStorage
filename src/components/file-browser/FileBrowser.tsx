@@ -130,6 +130,7 @@ export function FileBrowser({ user }: { user: AppUser }) {
   const [searchLoading, setSearchLoading] = useState(false);
 
   const [view, setView] = usePersistentState<"list" | "grid">("atlas:view", "list");
+  const [gridSize, setGridSize] = usePersistentState<"sm" | "md" | "lg">("atlas:gridSize", "md");
   const [sort, setSort] = usePersistentState<Sort>("atlas:sort", { key: "name", asc: true });
   const [showDetails, setShowDetails] = usePersistentState<boolean>("atlas:details", false);
 
@@ -821,7 +822,7 @@ export function FileBrowser({ user }: { user: AppUser }) {
 
   let content: React.ReactNode;
   if (showSkeleton) {
-    content = <LoadingSkeleton view={view} />;
+    content = <LoadingSkeleton view={view} gridSize={gridSize} />;
   } else if (error && !searching) {
     content = <ErrorState error={error} user={user} isRoot={!folderParam} onRetry={() => invalidateFolders()} onHome={() => navigate("")} />;
   } else if (!items.length) {
@@ -872,7 +873,7 @@ export function FileBrowser({ user }: { user: AppUser }) {
           onToggleAll={() => (allChecked === true ? clearSelection() : setSelected(new Set(items.map((i) => i.id))))}
         />
       ) : (
-        <GridView {...viewProps} />
+        <GridView {...viewProps} gridSize={gridSize} />
       );
   }
 
@@ -1016,6 +1017,15 @@ export function FileBrowser({ user }: { user: AppUser }) {
                   </button>
                 ))}
               </div>
+              {view === "grid" && (
+                <div className="segmented" role="radiogroup" aria-label="Tamanho dos ícones">
+                  {(["sm", "md", "lg"] as const).map((sz) => (
+                    <button key={sz} role="radio" aria-checked={gridSize === sz} data-active={gridSize === sz} onClick={() => setGridSize(sz)} title={sz === "sm" ? "Pequeno" : sz === "md" ? "Médio" : "Grande"} aria-label={sz === "sm" ? "Ícones pequenos" : sz === "md" ? "Ícones médios" : "Ícones grandes"}>
+                      <LayoutGrid size={sz === "sm" ? 12 : sz === "md" ? 15 : 18} />
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 className="btn btn-ghost btn-icon hidden md:flex"
                 data-pressed={showDetails}
