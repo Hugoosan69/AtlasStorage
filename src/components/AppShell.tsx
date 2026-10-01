@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { FolderOpen, Shield, LogOut, Menu as MenuIcon, X, Trash2, KeyRound } from "lucide-react";
+import { FolderOpen, Shield, LogOut, Menu as MenuIcon, X, Trash2, KeyRound, DollarSign } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -49,6 +49,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
   const nav = [
     { href: "/", label: "Arquivos", icon: FolderOpen, show: true },
     { href: "/lixeira", label: "Lixeira", icon: Trash2, show: true },
+    { href: "/financeiro", label: "Financeiro", icon: DollarSign, show: true },
     { href: "/admin", label: "Administração", icon: Shield, show: user.role === "admin" },
   ].filter((n) => n.show);
 

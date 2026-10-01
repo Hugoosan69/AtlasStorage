@@ -70,6 +70,17 @@ export interface Permission extends UserPermissions {
   inherit: boolean;
 }
 
+export interface FinancialTransaction {
+  id: string;
+  date: string;
+  type: "entrada" | "saida_mercadoria" | "saida_pessoal";
+  amount: number;
+  description: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AuditLog {
   id: string;
   user_id?: string;
