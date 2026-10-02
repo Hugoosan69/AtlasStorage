@@ -36,6 +36,7 @@ const EXTENSION_TYPES: Record<string, string> = {
   dxf: "Desenho CAD",
   psd: "Photoshop",
   ai: "Illustrator",
+  cdr: "CorelDRAW",
   json: "JSON",
   xml: "XML",
   html: "Página HTML",

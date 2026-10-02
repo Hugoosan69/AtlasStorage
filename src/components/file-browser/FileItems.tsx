@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, Minus, MoreHorizontal } from "lucide-react";
 import { FileIcon, FolderGlyph } from "./FileIcon";
-import { formatDate, formatFileSize } from "@/lib/file-types";
+import { formatDate, formatFileSize, previewKind } from "@/lib/file-types";
 import type { MenuAnchor } from "@/components/ui/Menu";
 import type { DriveItem } from "@/types";
 
@@ -259,20 +259,32 @@ export function ListView(
 /* ---------------- Grid ---------------- */
 
 function GridThumb({ item }: { item: DriveItem }) {
-  const [state, setState] = useState<"loading" | "ok" | "fail">(item.thumb ? "loading" : "fail");
+  const kind = previewKind(item.mimeType, item.name);
+  const thumbSrc = item.thumb ? `${item.thumb}&s=480` : null;
+  const inlineSrc = kind === "image" ? `/api/drive/download?fileId=${encodeURIComponent(item.id)}&inline=1` : null;
+  const initialSrc = thumbSrc || inlineSrc;
+  const [src, setSrc] = useState(initialSrc);
+  const [state, setState] = useState<"loading" | "ok" | "fail">(initialSrc ? "loading" : "fail");
   return (
     <div className="card-thumb">
-      {state !== "fail" && (
+      {state !== "fail" && src && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={`${item.thumb}&s=480`}
+          src={src}
           alt=""
           loading="lazy"
           draggable={false}
           className="w-full h-full object-cover transition-opacity duration-300"
           style={{ opacity: state === "ok" ? 1 : 0 }}
           onLoad={() => setState("ok")}
-          onError={() => setState("fail")}
+          onError={() => {
+            if (src === thumbSrc && inlineSrc) {
+              setSrc(inlineSrc);
+              setState("loading");
+            } else {
+              setState("fail");
+            }
+          }}
         />
       )}
       {state !== "ok" && (
