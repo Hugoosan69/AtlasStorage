@@ -93,3 +93,26 @@ export interface AuditLog {
   ip_address?: string;
   created_at: string;
 }
+
+export interface Receipt {
+  id: string;
+  receipt_number: number;
+  date: string;
+  value: number;
+  description: string;
+  payer_type: "juridica" | "fisica";
+  payer_name: string;
+  payer_cnpj: string | null;
+  payer_cpf: string | null;
+  payer_address: string | null;
+  recipient_name: string;
+  recipient_cnpj: string | null;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReceiptIssuer {
+  recipient_name: string;
+  recipient_cnpj: string;
+}
